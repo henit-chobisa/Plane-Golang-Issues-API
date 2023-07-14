@@ -94,28 +94,63 @@ func (q *Queries) GetIssue(ctx context.Context, id uuid.UUID) (Issue, error) {
 }
 
 const listIssuesByProject = `-- name: ListIssuesByProject :many
-SELECT id, description, priority, start_date, target_date, created_by_id, project_id FROM "issues"
-WHERE project_id=$1
-ORDER BY priority
+SELECT
+    i.id AS issue_id,
+    i.description AS issue_description,
+    i.priority AS issue_priority,
+    i.start_date AS issue_start_date,
+    i.target_date AS issue_target_date,
+    p.id AS project_id,
+    p.name AS project_name,
+    p.description AS project_description,
+    u.id AS created_by_id,
+    u.username AS created_by_username,
+    u.email AS created_by_email
+FROM
+    issues i
+JOIN
+    projects p ON i.project_id = p.id
+JOIN
+    users u ON i.created_by_id = u.id
+WHERE
+    p.id = $1
 `
 
-func (q *Queries) ListIssuesByProject(ctx context.Context, projectID uuid.UUID) ([]Issue, error) {
-	rows, err := q.db.QueryContext(ctx, listIssuesByProject, projectID)
+type ListIssuesByProjectRow struct {
+	IssueID            uuid.UUID      `json:"issue_id"`
+	IssueDescription   sql.NullString `json:"issue_description"`
+	IssuePriority      int32          `json:"issue_priority"`
+	IssueStartDate     sql.NullTime   `json:"issue_start_date"`
+	IssueTargetDate    sql.NullTime   `json:"issue_target_date"`
+	ProjectID          uuid.UUID      `json:"project_id"`
+	ProjectName        string         `json:"project_name"`
+	ProjectDescription sql.NullString `json:"project_description"`
+	CreatedByID        uuid.UUID      `json:"created_by_id"`
+	CreatedByUsername  string         `json:"created_by_username"`
+	CreatedByEmail     sql.NullString `json:"created_by_email"`
+}
+
+func (q *Queries) ListIssuesByProject(ctx context.Context, id uuid.UUID) ([]ListIssuesByProjectRow, error) {
+	rows, err := q.db.QueryContext(ctx, listIssuesByProject, id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Issue
+	var items []ListIssuesByProjectRow
 	for rows.Next() {
-		var i Issue
+		var i ListIssuesByProjectRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Description,
-			&i.Priority,
-			&i.StartDate,
-			&i.TargetDate,
-			&i.CreatedByID,
+			&i.IssueID,
+			&i.IssueDescription,
+			&i.IssuePriority,
+			&i.IssueStartDate,
+			&i.IssueTargetDate,
 			&i.ProjectID,
+			&i.ProjectName,
+			&i.ProjectDescription,
+			&i.CreatedByID,
+			&i.CreatedByUsername,
+			&i.CreatedByEmail,
 		); err != nil {
 			return nil, err
 		}

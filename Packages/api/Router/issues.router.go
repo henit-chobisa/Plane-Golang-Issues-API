@@ -50,4 +50,25 @@ func addIssuesHandlers(issuesController *fiber.App) {
 
 		return c.JSON(issue)
 	})
+
+	issuesController.Get("/getByProject/:projectid", func(c *fiber.Ctx) error {
+		project_id := c.Params("projectid")
+		uuid, err := uuid.Parse(project_id)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid UUID format",
+			})
+		}
+
+		issues, err := db.Db.ListIssuesByProject(context.Background(), uuid)
+
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to retrieve issues",
+			})
+		}
+
+		return c.JSON(issues)
+	})
+
 }
