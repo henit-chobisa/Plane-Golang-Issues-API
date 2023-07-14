@@ -8,7 +8,7 @@ import (
 	db "github.com/henit-chobisa/Plane-Golang-Issues-API/db/sqlc"
 )
 
-func Initialize(group fiber.Router) {
+func InitializeWorkspaceRouter(group fiber.Router) {
 	workspaceController := fiber.New()
 	addWorkspaceHandlers(workspaceController)
 	group.Mount("/workspaces", workspaceController)
