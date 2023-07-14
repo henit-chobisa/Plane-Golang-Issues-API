@@ -2,7 +2,6 @@ package router
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -17,7 +16,6 @@ func InitializeUserRouter(group fiber.Router) {
 
 func addUserHandlers(userController *fiber.App) {
 	userController.Post("/create", func(c *fiber.Ctx) error {
-		fmt.Println(string(c.Request().Body()))
 		var user db.CreateUserParams
 		if err := c.BodyParser(&user); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
