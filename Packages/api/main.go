@@ -34,6 +34,14 @@ func Start(host string, port int) {
 		CacheControl: true,
 	}))
 
+	app.Use(func(c *fiber.Ctx) error {
+		// Set a custom header on all responses:
+		c.Accepts(fiber.MIMEApplicationJSONCharsetUTF8)
+
+		// Go to next middleware:
+		return c.Next()
+	})
+
 	// Allow Cross-Origin Requests
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
