@@ -8,6 +8,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/google/uuid"
 )
@@ -30,7 +31,7 @@ VALUES (
     $4,
     $5,
     $6
-) RETURNING id, description, priority, start_date, target_date, created_by_id, project_id
+) RETURNING id, description, priority, start_date, target_date, created_by_id, project_id, state_id
 `
 
 type CreateIssueParams struct {
@@ -60,6 +61,7 @@ func (q *Queries) CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue
 		&i.TargetDate,
 		&i.CreatedByID,
 		&i.ProjectID,
+		&i.StateID,
 	)
 	return i, err
 }
@@ -74,7 +76,7 @@ func (q *Queries) DeleteIssue(ctx context.Context, id uuid.UUID) error {
 }
 
 const getIssue = `-- name: GetIssue :one
-SELECT id, description, priority, start_date, target_date, created_by_id, project_id FROM "issues"
+SELECT id, description, priority, start_date, target_date, created_by_id, project_id, state_id FROM "issues"
 WHERE id=$1 LIMIT 1
 `
 
@@ -89,37 +91,57 @@ func (q *Queries) GetIssue(ctx context.Context, id uuid.UUID) (Issue, error) {
 		&i.TargetDate,
 		&i.CreatedByID,
 		&i.ProjectID,
+		&i.StateID,
 	)
 	return i, err
 }
 
 const listIssuesByProject = `-- name: ListIssuesByProject :many
-SELECT id, description, priority, start_date, target_date, created_by_id, project_id FROM "issues"
-WHERE project_id=$1
-ORDER BY priority
+SELECT
+    json_build_object(
+        'name', i.id,
+        'description', i.description,
+        'priority', i.priority,
+        'start_date', i.start_date,
+        'target_date', i.target_date,
+        'state_detail', json_build_object(
+            'name', s.id,
+            'color', s.color
+        ),
+        'user', json_build_object(
+            'username', u.username,
+            'email', u.email
+        ),
+        'project', json_build_object(
+            'name', p.name,
+            'description', p.description
+        )
+    ) AS issue_data
+FROM
+    issues i
+JOIN
+    projects p ON i.project_id = p.id
+JOIN
+    users u ON i.created_by_id = u.id
+JOIN
+    states s ON i.state_id = s.id
+WHERE
+    p.id = $1
 `
 
-func (q *Queries) ListIssuesByProject(ctx context.Context, projectID uuid.UUID) ([]Issue, error) {
-	rows, err := q.db.QueryContext(ctx, listIssuesByProject, projectID)
+func (q *Queries) ListIssuesByProject(ctx context.Context, id uuid.UUID) ([]json.RawMessage, error) {
+	rows, err := q.db.QueryContext(ctx, listIssuesByProject, id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Issue
+	var items []json.RawMessage
 	for rows.Next() {
-		var i Issue
-		if err := rows.Scan(
-			&i.ID,
-			&i.Description,
-			&i.Priority,
-			&i.StartDate,
-			&i.TargetDate,
-			&i.CreatedByID,
-			&i.ProjectID,
-		); err != nil {
+		var issue_data json.RawMessage
+		if err := rows.Scan(&issue_data); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, issue_data)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
