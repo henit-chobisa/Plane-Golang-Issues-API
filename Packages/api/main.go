@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cache"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	db "github.com/henit-chobisa/Plane-Golang-Issues-API/db/sqlc"
 )
 
 func Start(host string, port int) {
@@ -20,6 +21,9 @@ func Start(host string, port int) {
 		JSONDecoder:      json.Unmarshal,
 		DisableKeepalive: true,
 	})
+
+	// Initialize Database, initializes a global db object, that can be used for db interactions
+	db.Initialize()
 
 	// Apply Response Cache
 	app.Use(cache.New(cache.Config{
@@ -37,10 +41,6 @@ func Start(host string, port int) {
 
 	// Initialize Request Logger
 	app.Use(logger.New())
-
-	app.Get("/", func(c *fiber.Ctx) error {
-		return c.SendString("Hello from Plane 👨🏼‍✈️")
-	})
 
 	log.Fatal(app.Listen(fmt.Sprintf("%v:%v", host, port)))
 }
