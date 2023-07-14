@@ -8,15 +8,13 @@ import (
 	db "github.com/henit-chobisa/Plane-Golang-Issues-API/db/sqlc"
 )
 
-var workspaceController *fiber.App
-
 func Initialize(group fiber.Router) {
 	workspaceController := fiber.New()
+	addWorkspaceHandlers(workspaceController)
 	group.Mount("/workspaces", workspaceController)
 }
 
-func AddWorkspaceHandlers(workspaceController *fiber.App) {
-
+func addWorkspaceHandlers(workspaceController *fiber.App) {
 	workspaceController.Post("/create", func(c *fiber.Ctx) error {
 		var workspace db.CreateWorkspaceParams
 		if err := c.BodyParser(&workspace); err != nil {
