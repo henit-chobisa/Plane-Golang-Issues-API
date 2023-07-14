@@ -19,6 +19,7 @@ type Issue struct {
 	TargetDate  sql.NullTime   `json:"target_date"`
 	CreatedByID uuid.UUID      `json:"created_by_id"`
 	ProjectID   uuid.UUID      `json:"project_id"`
+	StateID     uuid.NullUUID  `json:"state_id"`
 }
 
 type Project struct {

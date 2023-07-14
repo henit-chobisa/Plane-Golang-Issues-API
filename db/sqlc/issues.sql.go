@@ -8,6 +8,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/google/uuid"
 )
@@ -30,7 +31,7 @@ VALUES (
     $4,
     $5,
     $6
-) RETURNING id, description, priority, start_date, target_date, created_by_id, project_id
+) RETURNING id, description, priority, start_date, target_date, created_by_id, project_id, state_id
 `
 
 type CreateIssueParams struct {
@@ -60,6 +61,7 @@ func (q *Queries) CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue
 		&i.TargetDate,
 		&i.CreatedByID,
 		&i.ProjectID,
+		&i.StateID,
 	)
 	return i, err
 }
@@ -74,7 +76,7 @@ func (q *Queries) DeleteIssue(ctx context.Context, id uuid.UUID) error {
 }
 
 const getIssue = `-- name: GetIssue :one
-SELECT id, description, priority, start_date, target_date, created_by_id, project_id FROM "issues"
+SELECT id, description, priority, start_date, target_date, created_by_id, project_id, state_id FROM "issues"
 WHERE id=$1 LIMIT 1
 `
 
@@ -89,72 +91,57 @@ func (q *Queries) GetIssue(ctx context.Context, id uuid.UUID) (Issue, error) {
 		&i.TargetDate,
 		&i.CreatedByID,
 		&i.ProjectID,
+		&i.StateID,
 	)
 	return i, err
 }
 
 const listIssuesByProject = `-- name: ListIssuesByProject :many
 SELECT
-    i.id AS issue_id,
-    i.description AS issue_description,
-    i.priority AS issue_priority,
-    i.start_date AS issue_start_date,
-    i.target_date AS issue_target_date,
-    p.id AS project_id,
-    p.name AS project_name,
-    p.description AS project_description,
-    u.id AS created_by_id,
-    u.username AS created_by_username,
-    u.email AS created_by_email
+    json_build_object(
+        'name', i.id,
+        'description', i.description,
+        'priority', i.priority,
+        'start_date', i.start_date,
+        'target_date', i.target_date,
+        'state_detail', json_build_object(
+            'name', s.id,
+            'color', s.color
+        ),
+        'user', json_build_object(
+            'username', u.username,
+            'email', u.email
+        ),
+        'project', json_build_object(
+            'name', p.name,
+            'description', p.description
+        )
+    ) AS issue_data
 FROM
     issues i
 JOIN
     projects p ON i.project_id = p.id
 JOIN
     users u ON i.created_by_id = u.id
+JOIN
+    states s ON i.state_id = s.id
 WHERE
     p.id = $1
 `
 
-type ListIssuesByProjectRow struct {
-	IssueID            uuid.UUID      `json:"issue_id"`
-	IssueDescription   sql.NullString `json:"issue_description"`
-	IssuePriority      int32          `json:"issue_priority"`
-	IssueStartDate     sql.NullTime   `json:"issue_start_date"`
-	IssueTargetDate    sql.NullTime   `json:"issue_target_date"`
-	ProjectID          uuid.UUID      `json:"project_id"`
-	ProjectName        string         `json:"project_name"`
-	ProjectDescription sql.NullString `json:"project_description"`
-	CreatedByID        uuid.UUID      `json:"created_by_id"`
-	CreatedByUsername  string         `json:"created_by_username"`
-	CreatedByEmail     sql.NullString `json:"created_by_email"`
-}
-
-func (q *Queries) ListIssuesByProject(ctx context.Context, id uuid.UUID) ([]ListIssuesByProjectRow, error) {
+func (q *Queries) ListIssuesByProject(ctx context.Context, id uuid.UUID) ([]json.RawMessage, error) {
 	rows, err := q.db.QueryContext(ctx, listIssuesByProject, id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListIssuesByProjectRow
+	var items []json.RawMessage
 	for rows.Next() {
-		var i ListIssuesByProjectRow
-		if err := rows.Scan(
-			&i.IssueID,
-			&i.IssueDescription,
-			&i.IssuePriority,
-			&i.IssueStartDate,
-			&i.IssueTargetDate,
-			&i.ProjectID,
-			&i.ProjectName,
-			&i.ProjectDescription,
-			&i.CreatedByID,
-			&i.CreatedByUsername,
-			&i.CreatedByEmail,
-		); err != nil {
+		var issue_data json.RawMessage
+		if err := rows.Scan(&issue_data); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, issue_data)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
