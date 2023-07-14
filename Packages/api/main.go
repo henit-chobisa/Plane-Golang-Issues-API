@@ -55,6 +55,9 @@ func Start(host string, port int) {
 	v1 := app.Group("/v1")
 	router.InitializeWorkspaceRouter(v1)
 	router.InitializeUserRouter(v1)
+	router.InitializeProjectsRouter(v1)
+	router.InitializeStatesRouter(v1)
+	router.InitializeIssuesRouter(v1)
 
 	log.Fatal(app.Listen(fmt.Sprintf("%v:%v", host, port)))
 }
