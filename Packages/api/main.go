@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cache"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	router "github.com/henit-chobisa/Plane-Golang-Issues-API/Packages/api/Router"
 	db "github.com/henit-chobisa/Plane-Golang-Issues-API/db/sqlc"
 )
 
@@ -49,6 +50,11 @@ func Start(host string, port int) {
 
 	// Initialize Request Logger
 	app.Use(logger.New())
+
+	// Initialize Routes
+	v1 := app.Group("/v1")
+	router.InitializeWorkspaceRouter(v1)
+	router.InitializeUserRouter(v1)
 
 	log.Fatal(app.Listen(fmt.Sprintf("%v:%v", host, port)))
 }
